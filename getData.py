@@ -13,19 +13,19 @@ binance_client = Client(api_key=binance_api_key, api_secret=binance_api_secret)
 
 def download_binance_data(symbol, kline_size, start_date='1 Jan 2017'):
     """
-        Function that downloads raw data from binance API and saves to file. If file already exists, fetches
-        and appends new data.
-        - symbol: Ticker Symbol
-        - kline_size: Size of Klines
-        - start_date: optional start date
-       :return:
+    Function that downloads raw data from binance API and saves to file. If file already exists, fetches and appends
+    new data.
+    :param symbol: Ticker Symbol
+    :param kline_size: Size of Klines
+    :param start_date: Optional start date
+    :return: all raw data in dataframe
     """
     if not os.path.exists('./data'):
         os.mkdir('./data')
     if not os.path.exists('./data/raw'):
         os.mkdir('./data/raw')
 
-    filename = './data/raw/%s-%s-raw-data.csv' % (symbol, kline_size)
+    filename = './data/raw/%s_%s_raw_data.csv' % (symbol, kline_size)
     data = pd.read_csv(filename, index_col=0, header=0) if os.path.isfile(filename) else pd.DataFrame()
     start_time = datetime.strptime(start_date, '%d %b %Y')
     today = date.today()
