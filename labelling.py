@@ -1,90 +1,94 @@
-import numpy
 import pandas as pd
-# import mlfinlab as ml
-import os
+
 
 class Label:
 
     def __init__(self, data):
         self.data = data
 
-    def get_vol(self, delta, span = 100):
-      # 1. compute returns of the form p[t]/p[t-1] - 1
+    def get_volatility(self, delta, span = 100):
+        """
+        Function that computes the volatility in the price based on the returns: (p[t]/p[t-1]) - 1 in a specified timeframe.
+        Volatility is computed by taking the rolling standard deviation of the returns.
+        This function helps to define the threshold while defining BUY/SELL labels (i.e. the width of the channel).
+        :param delta: window size in minutes
+        :param span: the decay in terms of span for the exponential weighted average
+        :return: threshold value
+        """
+        # Find the timestamps of p[t-1] values
+        timestamp = self.data.index.searchsorted(pd.to_datetime(self.data.index) - delta)
+        timestamp = timestamp[timestamp > 0]
 
-      # 1.1 find the timestamps of p[t-1] values
-      df0 = self.data.index.searchsorted(self.data.close.index - delta)
-      df0 = df0[df0 > 0]
+        # Align timestamps of p[t-1] to timestamps of p[t]
+        timestamp = pd.Series(self.data.index[timestamp - 1],
+                              index=self.data.index[self.data.shape[0] - timestamp.shape[0]:])
 
-      # 1.2 align timestamps of p[t-1] to timestamps of p[t]
-      # d = self.data.close.index[df0 - 1]
-      df0 = pd.Series(self.data.index[df0-1], index=self.data.index[self.data.close.shape[0]-df0.shape[0]:])
+        # Get values by timestamps, then compute returns
+        returns = (self.data.loc[timestamp.index] / self.data.loc[timestamp.values].values) - 1
 
-      # 1.3 get values by timestamps, then compute returns
-      df0 = self.data.close.loc[df0.index] / self.data.close.loc[df0.values].values - 1
+        # Estimate rolling standard deviation
+        threshold = returns.ewm(span = span).std()
+        return threshold
 
-      ## Some debugging variables
-      # df0Index = numpy.array(df0.index.to_pydatetime(), dtype=numpy.datetime64)
-      # df0Values = df0.values
-      # a = self.data
-      # b = self.data.loc[df0Values]
-      # c = self.data.loc[df0Index]
-
-      # 2. estimate rolling standard deviation
-      df0 = df0.ewm(span = span).std()
-
-      return df0
 
     def get_horizons(self, delta):
-        t1 = self.data.index.searchsorted(self.data.close.index + delta)
-        t1 = t1[t1 < self.data.close.shape[0]]
-        t1 = self.data.index[t1]
-        t1 = pd.Series(t1, index=self.data.index[:t1.shape[0]])
-        return t1
+        """
+        Function that computes the timestamps at the end of each window size.
+        :param delta: window size in minutes
+        :return: array of timestamps defining the end of window sizes
+        """
+        horizon = self.data.index.searchsorted(self.data.index + delta)
+        horizon = horizon[horizon < self.data.shape[0]]
+        horizon = self.data.index[horizon]
+        horizon = pd.Series(horizon, index=self.data.index[:horizon.shape[0]])
+        return horizon
 
-    def get_touches(self, events, factors=[2, 1]):
-      #
-      # events: pd dataframe with columns
-      #   t1: timestamp of the next horizon
-      #   threshold: unit height of top and bottom barriers
-      #   side: the side of each bet
-      # factors: multipliers of the threshold to set the height of
-      #          top/bottom barriers
 
-      out = events[['t1']].copy(deep=True)
-      if factors[0] > 0: thresh_uppr = factors[0] * events['threshold']
-      else: thresh_uppr = pd.Series(index=events.index) # no uppr thresh
-      if factors[1] > 0: thresh_lwr = -factors[1] * events['threshold']
-      else: thresh_lwr = pd.Series(index=events.index)  # no lwr thresh
-      for loc, t1 in events['t1'].iteritems():
-        df0=self.data.close[loc:t1]                              # path prices
-        df0=(df0 / self.data.close[loc] - 1) * events.side[loc]  # path returns
-        out.loc[loc, 'stop_loss'] = \
-          df0[df0 < thresh_lwr[loc]].index.min()  # earliest stop loss
-        out.loc[loc, 'take_profit'] = \
-          df0[df0 > thresh_uppr[loc]].index.min() # earliest take profit
-      return out
+    def get_labels(self, variables, factors=[2, 1]):
+        """
+        Function that defines the thresholds based on multipliers(factors) and defines the timestamps where the price
+        return has crossed the threshold levels. It then assigns the corresponding labels to the timestamps.
+        :param variables: threshold values and horizon timestamps
+        :param factors: multipliers of the threshold to set the height of the top/bottom barriers
+        side: the side of each bet
+        :return: variable containing labels and trigger timestamps for the respective labels
+        """
+        labels = variables[['horizon']].copy(deep=True)
 
-    def get_labels(self, touches):
-      out = touches.copy(deep=True)
-      # pandas df.min() ignores NaN values
-      first_touch = touches[['stop_loss', 'take_profit']].min(axis=1)
-      for loc, t in first_touch.iteritems():
-        if pd.isnull(t):
-          out.loc[loc, 'label'] = 0
-        elif t == touches.loc[loc, 'stop_loss']:
-          out.loc[loc, 'label'] = -1
-        else:
-          out.loc[loc, 'label'] = 1
-      return out
+        thresh_uppr = factors[0] * variables['threshold']       # Define the upper threshold values
+        thresh_lwr = -factors[1] * variables['threshold']       # Define the lower threshold values
+
+        for index, horizon in variables['horizon'].iteritems():
+          returns = self.data[index:horizon]                                  # Define the path prices
+          returns = (returns / self.data[index] - 1) * variables.side[index]  # Calculate price returns:(p[t]/p[t-1])-1
+
+          labels.loc[index, 'sell'] = returns[returns < thresh_lwr[index]].index.min()  # Sell signals timestamps
+          labels.loc[index, 'buy'] = returns[returns > thresh_uppr[index]].index.min()  # Buy signals timestamps
+
+        # Assign the labels to their specific timestamp
+        for index, timestamp in labels[['sell', 'buy']].min(axis=1).iteritems():       # df.min() ignores NaN values
+            if pd.isnull(timestamp):
+                labels.loc[index, 'label'] = 0
+
+            elif timestamp == labels.loc[index, 'sell']:
+                labels.loc[index, 'label'] = -1
+
+            elif timestamp == labels.loc[index, 'buy']:
+                labels.loc[index, 'label'] = 1
+        return labels
 
 
     def generate(self, window_size):
-        delta = pd.Timedelta(minutes=window_size)
-        self.data = self.data.assign(threshold=self.get_vol(delta)).dropna()
-        self.data = self.data.assign(t1=self.get_horizons(delta)).dropna()
-        events = self.data[['t1', 'threshold']]
-        events = events.assign(side=pd.Series(1., events.index))  # long only
-        touches = self.get_touches(events, [1, 1])
-        touches = self.get_labels(touches)
-        self.data = self.data.assign(label=touches.label)
-        return self.data
+        delta = pd.Timedelta(minutes=window_size)       # window size
+
+        # Compute variables: horizon = the price at the end of the window size
+        #                    threshold = threshold for defining a label (i.e. size of the vertical channel)
+        #                    side = buy/sell only strategy OR hybrid strategy(--- to be implemented ---)
+        variables = pd.DataFrame()
+        variables = variables.assign(horizon=self.get_horizons(delta)).dropna()
+        variables = variables.assign(threshold=self.get_volatility(delta)).dropna()
+        variables = variables.assign(side=pd.Series(1., variables.index))  # long only
+
+        labels = self.get_labels(variables, [1, 1])
+        variables = variables.assign(label=labels.label)
+        return variables

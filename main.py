@@ -1,71 +1,78 @@
-from labelling import Label
+from preprocess import preprocess
+from CNN import generate_model
 
-import pandas as pd
-import numpy as np
-import datetime
+from tables import *
+import h5py
+import tftables
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+import numpy as np
+import pandas as pd
 
+### Preprocess data
+data = preprocess()
 
-##################################### LABEL GENERATION & TESTING ######################################
-
-## Generate labels
-
-label = Label(data[['close']])
-labels = label.generate(window_size = 500)
-data = pd.merge_asof(left=data, right=labels[['label']],
-                     right_index=True, left_index=True, direction='nearest', tolerance=pd.Timedelta('1 second'))
-
-data.dropna(inplace=True)
-
-
-
-
-
-###################################### PLOTTING ######################################
-
-## Plot labels on data
-# fig, ax = plt.subplots()
+# file = open_file('./data/preprocessed/BTCUSDT_5m_data.h5', mode = 'r')
+# data = file.root.data
 #
-# ax.plot(data.close.iloc[1:200])
-# for i, label in enumerate(data.label):
-#     timestamp = data['label'].index[i]
-#     labels = str(int(label))
-#     x = data.close
-#     ax.annotate(labels, xy= (timestamp, x.iloc[i]))
-# plt.show()
-
-# a = ax[1,0].imshow(images[:,:,0])
-# plt.colorbar(a)
-
-
-## Plot animation of price and RP transform
-# fig, ax = plt.subplots(2)
-# # i=520
-# # # plt.imshow(normImages1[i,:,:])
-# # ax[1].imshow(normImages1[i,:,:])
-# # plt.plot(data.Close[i:i+400])
-# # plt.show()
-# def animate(i):
-#     ax[0].plot(data.close.iloc[1:imageSize+i], 'b')
-#     print(data.Labels[imageSize + i])
-#     ax[1].imshow(normImages1[i,:,:])
 #
-# animate = FuncAnimation(plt.gcf(), animate, frames = 400, interval=3000)
-# plt.tight_layout()
-# plt.show()
+# RSI =data.RSI[:]
 
 
-## Plot indicators
-# plt.figure(figsize=(20, 10))
-# plt.plot(data['RSI'], color='k', alpha=0.8)
-# plt.show()
+
+
+
+
+# def print_attrs(name, obj):
+#     print(name)
+#     for key, val in obj.attrs.items():
+#         print("    %s: %s" % (key, val))
 #
-# plt.figure(figsize=(20, 10))
-# plt.plot(data['MACD'], color='r', alpha=0.8)
-# plt.plot(data['MACDS'], color='b', alpha=0.8)
-# plt.show()
 #
-# plt.figure(figsize=(20, 10))
-# plt.plot(data['K'], color='g', alpha=0.8)
-# plt.show()
+# with h5py.File('./data/preprocessed/BTCUSDT_5m_data.h5', 'r') as hdf:
+#     group = hdf.get('data')
+#     data_items = list(group.items())
+#     close = np.array(group.get('close'))
+#     print(close.shape)
+#     # print(group)
+#     # print(data)
+#     # print(hdf.visititems(print_attrs))
+#     print(names)
+
+#
+# print(list(file.keys()))
+# Open the HDF5 file and create a loader for a dataset.
+# The batch_size defines the length (in the outer dimension)
+# of the elements (batches) returned by the reader.
+# Takes a function as input that pre-processes the data.
+# loader = tftables.load_dataset(filename='./data/preprocessed/BTCUSDT_5m_data.h5',
+#                                dataset_path='/data',
+#                                batch_size=20)
+
+# # To get the data, we dequeue it from the loader.
+# # Tensorflow tensors are returned in the same order as input_transformation
+# truth_batch, data_batch = loader.dequeue()
+#
+# # The placeholder can then be used in your network
+# result = my_network(truth_batch, data_batch)
+#
+#
+# print(data.path)
+# array_batch_placeholder = file.get_batch(
+#     path = '/h5/path',  # This is the path to your array inside the HDF5 file.
+#     cyclic = True,      # In cyclic access, when the reader gets to the end of the
+#                         # array, it will wrap back to the beginning and continue.
+#     ordered = False     # The reader will not require the rows of the array to be
+#                         # returned in the same order as on disk.
+
+# a = []
+# images = np.empty((752, 200, 200, 5))
+# labels = []
+#
+# for node in data.__iter__():
+#     i = 0
+#     if node.name == 'label':
+#         labels = np.stack(node[:])
+#     else:
+#         a[i] = node[:]
+#         np.append(images[..., i], node[:])
+#     i += 1

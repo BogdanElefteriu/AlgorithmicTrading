@@ -2,3 +2,6 @@ venv/
 .idea/
 logs/
 data/
+github-recovery-codes.txt
+tests.py
+__pycache__/
