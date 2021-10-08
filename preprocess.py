@@ -94,13 +94,12 @@ def preprocess(raw_data_path= './data/raw/BTCUSDT_5m_raw_data.csv'):
     data_file.create_group("/", 'data', 'Distance Matrix Images')
 
     # Save the labels on the disk
-    label_storage = data_file.create_array(data_file.root, 'label', tables.Int8Atom(), shape = (0,),
-                                            filters = filters, expectedrows = data.label.size)
+    label_storage = data_file.create_carray(data_file.root, 'label', tables.Int8Atom(),
+                                            shape = (1,data.label.shape[0]-img_size+1),  filters = filters)
 
-    for i in enumerate(data.label):
-        if math.isnan(i[1]) is False:
-            label_storage.append(np.expand_dims(i[1], 0).astype('int8'))
-
+    labels = data.label
+    labels.dropna(inplace=True)
+    label_storage[:] = np.array(labels)
 
     ### Generate distance matrices
     total_time = data.close.size
