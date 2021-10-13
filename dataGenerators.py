@@ -1,14 +1,12 @@
 import numpy as np
-import tables
-import pandas as pd
 from tensorflow.keras.utils import Sequence, to_categorical
 
 
 class DataGenerator(Sequence):
-    def __init__(self, data_file, indices, batch_size, shuffle=True):
+    def __init__(self, data_file, indices, batch_size, shuffle=False):
         self.data_file = data_file
-        self.indices = indices
         self.batch_size = batch_size
+        self.indices = indices
         self.shuffle = shuffle
         self.on_epoch_end()
 

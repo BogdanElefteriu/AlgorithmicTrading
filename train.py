@@ -8,7 +8,7 @@ from tensorflow.keras.callbacks import TensorBoard
 from models import BasicCNN
 from dataGenerators import DataGenerator
 
-batch_size = 300
+batch_size = 30
 nr_channels = 5
 
 file = tb.open_file('./data/preprocessed/BTCUSDT_5m_data.h5', 'r')
@@ -20,7 +20,7 @@ img_size = data_size[1]
 
 # Train Validation Split
 split = 0.8
-idx = random.sample(range(data_length), data_length)
+idx = list(np.arange(0, data_length))
 training_idx = idx[:int(split*len(idx))]
 validation_idx = idx[int(split*len(idx)):]
 
