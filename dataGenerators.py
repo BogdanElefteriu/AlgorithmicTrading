@@ -1,6 +1,7 @@
 import numpy as np
 import tables
-from tensorflow.keras.utils import Sequence
+import pandas as pd
+from tensorflow.keras.utils import Sequence, to_categorical
 
 
 class DataGenerator(Sequence):
@@ -17,13 +18,24 @@ class DataGenerator(Sequence):
 
     def __getitem__(self, index):
         # Generates one batch of data
-        X = []
-        y = []
-        for i in self.indices[index * self.batch_size: (index + 1) * self.batch_size]:
-            X.append(self.data_file.root.data.close[i])
-            y.append(self.data_file.root.labels[i])
+        images = []
+        labels = []
 
-        return X, y
+        lwr = index * self.batch_size
+        upr = ((index + 1) * self.batch_size)
+
+        labels.append(self.data_file.root.label[:,lwr:upr])
+        labels = np.squeeze(np.array(labels))
+        labels = to_categorical(labels, 3)
+
+        for im in self.data_file.root.data:
+            images.append(np.array(im[lwr:upr]))
+        images = np.moveaxis(np.array(images), 0, -1)
+
+        # print('images : shape = %s, type = %s' % (images.shape, images.dtype))
+        # print('labels : shape = %s, type = %s' % (labels.shape, labels.dtype))
+
+        return images, labels
 
     def on_epoch_end(self):
         if self.shuffle:

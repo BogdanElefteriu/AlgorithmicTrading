@@ -1,7 +1,6 @@
 import time
 import ta
 import os
-import math
 import pandas as pd
 import tables
 import numpy as np
@@ -24,8 +23,8 @@ img_size = 200 # in 5 minute intervals
 sigma = 2  # smoothening factor
 
 # Shorten data for testing
-start = pd.to_datetime("2021-09-01 00:00:00")
-end = pd.to_datetime("2021-09-05 00:00:00")
+start = pd.to_datetime("2020-09-01 00:00:00")
+end = pd.to_datetime("2021-09-01 00:00:00")
 
 
 def preprocess(raw_data_path= './data/raw/BTCUSDT_5m_raw_data.csv'):
@@ -81,22 +80,22 @@ def preprocess(raw_data_path= './data/raw/BTCUSDT_5m_raw_data.csv'):
     ### Generate labels for each image in the dataset and arrange each label with its associated image
     label = Label(data.close)
     labels = label.generate(window_size=window_size)
-    data = pd.merge_asof(left=data, right=labels[['label']], right_index=True, left_index=True,
+
+    data = pd.merge_asof(left=data, right=labels[['label']],
+                         right_index=True, left_index=True,
                          direction='nearest', tolerance=pd.Timedelta('1 second'))
     data.dropna(inplace=True)
-
-    # Arrange labels with the images
-    data.label = data.label[img_size-1:]
 
     # Open the datafile in preparation for writing label and image data to the disk
     data_file = tables.open_file('./data/preprocessed/{}_{}_data.h5'.format(pair, time_interval), mode="w")
     filters = tables.Filters(complevel=5, complib='blosc')
     data_file.create_group("/", 'data', 'Distance Matrix Images')
 
-    # Save the labels on the disk
     label_storage = data_file.create_carray(data_file.root, 'label', tables.Int8Atom(),
                                             shape = (1,data.label.shape[0]-img_size+1),  filters = filters)
 
+    # Arrange labels with the images (i.e. fill labels with NaN until 1st image timestamp) and save to disk
+    data.label = data.label[img_size - 1:]
     labels = data.label
     labels.dropna(inplace=True)
     label_storage[:] = np.array(labels)
@@ -107,7 +106,7 @@ def preprocess(raw_data_path= './data/raw/BTCUSDT_5m_raw_data.csv'):
     # Save the images on the disk
     for signal in ['close', 'volume', 'RSI', 'MACD', 'MACDS']:
         data_storage = data_file.create_earray(data_file.root.data, signal, tables.Float32Atom(),
-                                        shape=(0, img_size, img_size), filters=filters, expectedrows=total_time - img_size)
+                                        shape=(0, img_size, img_size), filters=filters, expectedrows=total_time-img_size)
         for i in range(0, total_time - img_size + 1):
             dist_mat = euclidean_distances(data[signal].iloc[i:img_size+i].values.reshape(-1, 1))
             image = gaussian_filter(dist_mat, sigma=sigma)
