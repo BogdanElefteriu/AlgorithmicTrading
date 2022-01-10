@@ -22,12 +22,12 @@ class DataGenerator(Sequence):
         lwr = index * self.batch_size
         upr = ((index + 1) * self.batch_size)
 
-        labels.append(self.data_file.root.label[:,lwr:upr])
+        labels.append(self.data_file.root.label[:, self.indices[lwr:upr]])
         labels = np.squeeze(np.array(labels))
         labels = to_categorical(labels, 3)
 
         for im in self.data_file.root.data:
-            images.append(np.array(im[lwr:upr]))
+            images.append(np.array(im[self.indices[lwr:upr], :, :]))
         images = np.moveaxis(np.array(images), 0, -1)
 
         # print('images : shape = %s, type = %s' % (images.shape, images.dtype))
