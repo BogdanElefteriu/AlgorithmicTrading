@@ -54,7 +54,7 @@ def applyPtSl(data, events, ptSl):
     """
 
     # apply stop loss/profit taking, if it takes place before t1 (end of event)
-    out = events[['t1']].copy(deep=True)
+    out = events[['triger']].copy(deep=True)
 
     # If the upper barrier is active(ptSl[0]>0) then compute its threshold based on volatility
     if ptSl[0]>0:
@@ -69,7 +69,7 @@ def applyPtSl(data, events, ptSl):
         sl = pd.Series(index=events.index) # NaNs
 
     # Compute the timestamp at which the first (lower or upper) barrier was hit based on threshold
-    for loc, t1 in events['t1'].fillna(data.index[-1]).iteritems():
+    for loc, t1 in events['trigger'].fillna(data.index[-1]).iteritems():
         df = data[loc:t1] # path prices
         df = (df/data[loc]-1) * events.at[loc, 'side'] # path returns
 
@@ -78,7 +78,7 @@ def applyPtSl(data, events, ptSl):
 
     return out
 
-def getEvents(data, ptSl, delta, minRet=0.005, t1=False, side=None):
+def getEvents(data, ptSl, delta, minRet=0.005, trigger=False, side=None):
     """
     This function defines the barriers threshold(trgt) as the volatility and uses it
     to calculate the timestamps at which the upper/lower barriers are hit.
@@ -99,8 +99,8 @@ def getEvents(data, ptSl, delta, minRet=0.005, t1=False, side=None):
     trgt = trgt[trgt > minRet]
 
     # If there is no window end (vertical barrier), then fill t1 with NaNs
-    if t1 is False:
-        t1 = pd.Series(pd.NaT, index=trgt.index)
+    if trigger is False:
+        trigger = pd.Series(pd.NaT, index=trgt.index)
 
     # If there is no side provided, then fill side_ with 1's
     if side is None:
@@ -110,13 +110,13 @@ def getEvents(data, ptSl, delta, minRet=0.005, t1=False, side=None):
         side_ = side.loc[trgt.index]
         ptSl_ = ptSl[:2]
 
-    events = (pd.concat({'t1':t1,'trgt':trgt,'side':side_}, axis=1)
+    events = (pd.concat({'triger':trigger,'trgt':trgt,'side':side_}, axis=1)
               .dropna(subset=['trgt']))
 
     # Calculate the timestamps at which the barriers are hit given the volatility threshold
     df = applyPtSl(data, events, ptSl_)
 
-    events['t1']=df.dropna(how='all').min(axis=1) #pd.min ignores nan
+    events['triger']=df.dropna(how='all').min(axis=1) #pd.min ignores nan
 
     # If there was no side given as an input, eliminate the
     # generated side(used only for calculation consistency) from the output
@@ -133,15 +133,15 @@ def getBins(data, events):
     data is the close price of the asset
     events is a DataFrame where:
     -events.index is event's starttime
-    -events['t1'] is event's endtime
+    -events['trigger'] is event's endtime
     -events['trgt'] is event's target
     -events['side'] (optional) implies the algo's position side
     Case 1: ('side' not in events): bin in (-1,1) <-label by price action
     Case 2: ('side' in events): bin in (0,1) <-label by pnl (meta-labeling)
     '''
     # Align prices with events
-    events_ = events.dropna(subset=['t1'])
-    px = events_.index.union(events_['t1'].values).drop_duplicates()
+    events_ = events.dropna(subset=['trigger'])
+    px = events_.index.union(events_['trigger'].values).drop_duplicates()
     px = data.reindex(px, method='bfill')
 
     # Create output object and calculate the path returns
